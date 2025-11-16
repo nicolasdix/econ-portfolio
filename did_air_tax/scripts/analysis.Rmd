@@ -27,7 +27,7 @@ df <- read_csv(filepath, show_col_types = F)
 ```{r}
 summary(df)
 ```
-## Preparations
+## Preparations 2011 Shock
 ```{r}
 df <- df %>% drop_na(value)
 
@@ -61,7 +61,8 @@ df_plot <- df_panel %>%
 
 ggplot(df_plot, aes(x = date, y = avg_pass, color = geography)) +
   geom_line(size = 1.1) +
-  geom_vline(xintercept = 2011, linetype = "dashed") +  # no label arg here
+  geom_vline(xintercept = 2011, linetype = "dashed") +
+  geom_vline(xintercept = 2018, linetype = "dashed") +
   annotate(
     "label",
     x = 2011,
@@ -71,12 +72,22 @@ ggplot(df_plot, aes(x = date, y = avg_pass, color = geography)) +
     alpha = 1,
     size = 3
   ) +
+  annotate(
+    "label",
+    x = 2018,
+    y = max(df_plot$avg_pass) * 1.02,   # use df_plot, not df_panel
+    label = "2018 Changes",
+    fill = "white",
+    alpha = 1,
+    size = 3
+  ) +
   coord_cartesian(clip = "off") +
   theme_minimal() +
   labs(
     title = "Passenger Volume Trends: Austria vs Controls",
     y = "Average Yearly Passengers",
-    x = "Year"
+    x = "Year",
+    color = "Country"
   )
 ```
 ```{r}
@@ -85,6 +96,36 @@ models <- list("DID: log passengers" = did)
 modelsummary(
   models,
   output = "did_table.tex",    # writes a .tex file
+  statistic = "({std.error})", # show SE in parentheses
+  stars = TRUE,                # significance stars
+  gof_omit = "IC|Log|Adj"      # drop clutter like AIC, logLik, etc.
+)
+```
+
+## Preparations 2018 Shock
+```{r}
+df_panel <- df_panel %>% mutate(
+  post_2018 = ifelse(date >= "2018", 1, 0),
+)
+```
+
+## DID regression with two-way fixed effects
+```{r}
+did2 <- lm_robust(log_passengers ~ treatment:post_2018 + factor(geography) + factor(date),
+                 data = df_panel,
+                 clusters = geography)
+
+summary(did2)
+```
+## Interpretation
+#### The estimated effect of the 2018 Air Tax reduction on passenger volume is -6.7% at a p-value of 0.38 (> 0.05). We therefore find no evidence that the changes of the Air Tax had any detectable effect on passenger volumes in Austria, relative to comparable countries in Central Europe.
+
+```{r}
+models2 <- list("DID: log passengers" = did2)
+
+modelsummary(
+  models2,
+  output = "did2_table.tex",    # writes a .tex file
   statistic = "({std.error})", # show SE in parentheses
   stars = TRUE,                # significance stars
   gof_omit = "IC|Log|Adj"      # drop clutter like AIC, logLik, etc.
