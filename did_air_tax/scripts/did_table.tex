@@ -1,0 +1,60 @@
+\begin{table}
+\centering
+\begin{talltblr}[         %% tabularray outer open
+entry=none,label=none,
+note{}={+ p \num{< 0.1}, * p \num{< 0.05}, ** p \num{< 0.01}, *** p \num{< 0.001}},
+]                     %% tabularray outer close
+{                     %% tabularray inner open
+colspec={Q[]Q[]},
+hline{2}={1-2}{solid, black, 0.05em},
+hline{40}={1-2}{solid, black, 0.05em},
+hline{1}={1-2}{solid, black, 0.1em},
+hline{44}={1-2}{solid, black, 0.1em},
+column{2}={}{halign=c},
+column{1}={}{halign=l},
+}                     %% tabularray inner close
+& DID: log passengers \\
+(Intercept) & \num{16.924}*** \\
+& (\num{0.010}) \\
+factor(geography)CZ & \num{-0.709}*** \\
+& (\num{0.075}) \\
+factor(geography)HR & \num{-1.447}*** \\
+& (\num{0.075}) \\
+factor(geography)HU & \num{-0.956}*** \\
+& (\num{0.075}) \\
+factor(geography)PL & \num{-0.017} \\
+& (\num{0.070}) \\
+factor(geography)SI & \num{-2.987}*** \\
+& (\num{0.075}) \\
+factor(geography)SK & \num{-2.635}*** \\
+& (\num{0.075}) \\
+factor(date)2010 & \num{0.023} \\
+& (\num{0.019}) \\
+factor(date)2011 & \num{0.070} \\
+& (\num{0.052}) \\
+factor(date)2012 & \num{0.034} \\
+& (\num{0.087}) \\
+factor(date)2013 & \num{0.062} \\
+& (\num{0.090}) \\
+factor(date)2014 & \num{0.117} \\
+& (\num{0.095}) \\
+factor(date)2015 & \num{0.205}* \\
+& (\num{0.093}) \\
+factor(date)2016 & \num{0.283}** \\
+& (\num{0.106}) \\
+factor(date)2017 & \num{0.420}*** \\
+& (\num{0.109}) \\
+factor(date)2018 & \num{0.532}*** \\
+& (\num{0.114}) \\
+factor(date)2019 & \num{0.590}*** \\
+& (\num{0.126}) \\
+factor(date)2020 & \num{-1.042}*** \\
+& (\num{0.154}) \\
+treatment × post\_2011 & \num{-0.020} \\
+& (\num{0.090}) \\
+Num.Obs. & \num{83} \\
+R2 & \num{0.992} \\
+RMSE & \num{0.11} \\
+Std.Errors & by: geography \\
+\end{talltblr}
+\end{table}

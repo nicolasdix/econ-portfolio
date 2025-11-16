@@ -1,0 +1,93 @@
+---
+title: "analysis"
+output: html_document
+date: "2025-11-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(here)
+library(estimatr)
+library(modelsummary)
+```
+
+## Data
+```{r}
+filepath <- here("did_air_tax/data/passengers_air_transport.csv")
+df <- read_csv(filepath, show_col_types = F)
+```
+
+## Glimpse
+```{r}
+summary(df)
+```
+## Preparations
+```{r}
+df <- df %>% drop_na(value)
+
+controls <- c("SK", "CZ", "HU", "SI", "HR", "PL")
+
+df_panel <- df %>% filter(
+  geography %in% c("AT", controls))
+
+df_panel <- df_panel %>% mutate(
+  treatment = ifelse(geography == "AT", 1, 0),
+  post_2011 = ifelse(date >= "2011", 1, 0),
+  log_passengers = log(value + 1)
+)
+```
+
+## DID regression with two-way fixed effects
+```{r}
+did <- lm_robust(log_passengers ~ treatment:post_2011 + factor(geography) + factor(date),
+                 data = df_panel,
+                 clusters = geography)
+
+summary(did)
+```
+## Interpretation
+#### The estimated effect of the 2011 Air Tax on passenger volume is -1.96% at a p-value of 0.84 (> 0.05). We therefore find no evidence that the introduction of the 2011 Air Tax had any detectable effect on passenger volumes in Austria, relative to comparable countries in Central Europe.
+
+```{r}
+df_plot <- df_panel %>%
+  group_by(date, geography) %>%
+  summarise(avg_pass = mean(value), .groups = "drop")
+
+ggplot(df_plot, aes(x = date, y = avg_pass, color = geography)) +
+  geom_line(size = 1.1) +
+  geom_vline(xintercept = 2011, linetype = "dashed") +  # no label arg here
+  annotate(
+    "label",
+    x = 2011,
+    y = max(df_plot$avg_pass) * 1.02,   # use df_plot, not df_panel
+    label = "2011 Air Tax",
+    fill = "white",
+    alpha = 1,
+    size = 3
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_minimal() +
+  labs(
+    title = "Passenger Volume Trends: Austria vs Controls",
+    y = "Average Yearly Passengers",
+    x = "Year"
+  )
+```
+```{r}
+models <- list("DID: log passengers" = did)
+
+modelsummary(
+  models,
+  output = "did_table.tex",    # writes a .tex file
+  statistic = "({std.error})", # show SE in parentheses
+  stars = TRUE,                # significance stars
+  gof_omit = "IC|Log|Adj"      # drop clutter like AIC, logLik, etc.
+)
+```
+
