@@ -1,0 +1,84 @@
+---
+title: "ML model"
+output:
+  html_document: default
+  pdf_document: default
+date: "2025-11-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+```{r}
+library(tidyverse)
+library(caret)
+library(ggplot2)
+```
+
+## Data
+```{r}
+df <- mtcars
+head(df)
+```
+
+```{r}
+df <- df %>% na.omit
+summary(df)
+```
+
+```{r}
+set.seed(42)
+train_index <- createDataPartition(df$mpg, p = 0.8, list = FALSE)
+train_data <- df[train_index, ]
+test_data <- df[-train_index, ]
+```
+
+#### Set seed for reproducibility, use data partition functin from caret to split into train and test data, here an 80-20 split is used.
+
+## Train ML model
+```{r}
+model <- train(
+  mpg ~ wt + hp,
+  data = train_data,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 5)
+)
+print(model)
+```
+
+#### We try to predict mpg by wt (weight in 1000lbs) and hp (horsepower) using a linear regression model. 5-fold cross-validation is applied in the training process.
+
+## Make predictions on test_data and see results
+```{r}
+predict <- predict(model, newdata = test_data)
+
+results <- data.frame(
+  Actual = test_data$mpg,
+  Predicted = predict
+)
+
+rmse <- sqrt(mean((results$Actual - results$Predicted)^2))
+print(paste("RMSE: ", rmse))
+print(results)
+```
+
+#### The data frame shows the actual mpg values against the predicted values. The RMSE (Root Mean Squared Error) equals 1.175, meaning that the average size of the prediction error expressed in units of the target variable (here mpg) is 1.175, i.e. the model is off by 1.175 mpg on average.
+
+## Visualization Actual vs. Prediction
+```{r}
+results %>% ggplot(aes(x = Actual, y = Predicted)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  coord_equal() +
+  labs(
+    title = "Actual vs. Predicted MPG",
+    x = "Actual MPG",
+    y = "Predicted MPG"
+  ) +
+  theme_minimal()
+```
+
+#### The points are relatively close to the diagonal line of perfect prediction, indicating that the model is predicting MPG with reasonable accuracy. However, the training dataset is very small to draw absolute conclusions on whether a linear pattern is justified or if the data follows a cubic or other non-linear pattern.
+
