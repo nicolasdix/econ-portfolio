@@ -1,0 +1,132 @@
+---
+title: "Fertility & Development - How do education and infrastructure affect fertility?"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1) Introduction
+***
+#### In the following, the fertil2 dataset from the wooldridge package is used to test assumptions of development economics. Precisely, it will be observed how different socioeconomic factors influence fertility. Eventually, an ML model will be trained to predict "ever born children" (= fertility) based on a set of independent variables.
+
+## 2) Libraries
+***
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(caret)
+library(wooldridge)
+library(randomForest)
+```
+
+## 3) Data
+***
+```{r}
+df <- fertil2
+head(df)
+```
+
+```{r}
+df <- df %>% na.omit()
+summary(df)
+```
+
+## 4) Random seed and train-test split in 90-10 ratio
+***
+```{r}
+set.seed(123)
+train_index <- createDataPartition(df$ceb, p = 0.9, list = F)
+train_data <- df[train_index, ]
+test_data <- df[-train_index, ]
+```
+
+## 5) Train model with IVs educ (years of education), age, urban (1 if living in an urban area), electric (1 if access to electricity) and yearborn (birth year of observed woman). Best model is chosen through 5-fold cross-validation.
+***
+```{r}
+dev_model <- train(
+  ceb ~ educ + age + urban + electric + yearborn,
+  data = train_data,
+  model = "lm",
+  trControl = trainControl(method = "cv", number = 5)
+)
+
+print(dev_model)
+```
+```{r}
+prediction <- predict(dev_model, newdata = test_data)
+
+results <- data.frame(
+  Actual = test_data$ceb,
+  Predicted = prediction
+)
+
+rmse <- sqrt(mean((results$Actual - results$Predicted)^2))
+print(paste("RMSE: ", rmse))
+print(results)
+```
+
+## 6) Female Education vs. Fertility
+***
+```{r}
+ggplot(df, aes(x = educ, y = ceb)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm") +
+  labs(
+    title = "Female Education vs. Fertility",
+    x = "Years of Education",
+    y = "Number of Children"
+  ) +
+  theme_minimal()
+```
+```{r}
+lm1 <- lm(ceb ~ educ, data = df)
+summary(lm1)
+```
+#### It is the textbook assumption of development economics, that as female education increases fertility rates drop. The graphic and accompanying linear regression confirm that assumption.
+
+## 7) Fertility in Urban vs. Rural Areas
+***
+```{r}
+ggplot(df, aes(x = factor(urban), y = ceb)) +
+  geom_boxplot() +
+  labs(
+    title = "Fertility in Urban vs. Rural Areas",
+    x = "Urban (1 = Yes, 0 = No)",
+    y = "Number of Children"
+  ) +
+  theme_minimal()
+```
+
+## 8) Performance of ML model
+***
+```{r}
+t.test(ceb ~ urban, data = df)
+```
+#### It is another textbook assumption that females in urban areas tend to have fewer children than those in rural areas. The graphic above and the accompanying t-test confirm that assumption and show that in fact, females in urban areas usually (95% confidence) have between 0.86 to 1.29 children less than those in rural areas.
+
+## 9) ML model results
+***
+```{r}
+ggplot(results, aes(x = Actual, y = Predicted)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(
+    title = "Actual vs. Predicted Fertility",
+    x = "Actual number of children",
+    y = "Predicted number of children"
+  ) +
+  theme_minimal()
+```
+
+#### The plot above shows the actual number of ever born children (dashed line) and the numbers predicted by the ML model.
+
+## 10) Comparison to baseline assumption
+***
+```{r}
+print(paste("RMSE: ", rmse))
+print(paste("SD(ceb): ", sd(df$ceb)))
+```
+
+#### The model's RMSE equals 1.86, i.e. on average the model is off by 1.86 "ever born children". Given the complex social, cultural and economic factors that influence fertility, the model has a moderate level of predictive accuracy, but also highlights important unexplained variation. The standard deviation of the dependent variable (ceb) is 2.31. This indicates that the model performs better than a naive baseline prediction that just guesses the mean number of ever born children for all observations.
