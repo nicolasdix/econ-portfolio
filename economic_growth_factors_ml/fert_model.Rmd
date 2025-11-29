@@ -45,10 +45,12 @@ test_data <- df[-train_index, ]
 ## 5) Train model with IVs educ (years of education), age, urban (1 if living in an urban area), electric (1 if access to electricity) and yearborn (birth year of observed woman). Best model is chosen through 5-fold cross-validation.
 ***
 ```{r}
+formula <- ceb ~ urban*educ + age + electric + yearborn + agefbrth + knowmeth + agefm + heduc + spirit + protest + catholic + evermarr
+
 dev_model <- train(
-  ceb ~ educ + age + urban + electric + yearborn,
+  formula,
   data = train_data,
-  model = "lm",
+  method = "lm",
   trControl = trainControl(method = "cv", number = 5)
 )
 
@@ -129,4 +131,4 @@ print(paste("RMSE: ", rmse))
 print(paste("SD(ceb): ", sd(df$ceb)))
 ```
 
-#### The model's RMSE equals 1.86, i.e. on average the model is off by 1.86 "ever born children". Given the complex social, cultural and economic factors that influence fertility, the model has a moderate level of predictive accuracy, but also highlights important unexplained variation. The standard deviation of the dependent variable (ceb) is 2.31. This indicates that the model performs better than a naive baseline prediction that just guesses the mean number of ever born children for all observations.
+#### The model's RMSE equals 1.57, i.e. on average the model is off by 1.57 "ever born children". Given the complex social, cultural and economic factors that influence fertility, the model has a moderate level of predictive accuracy, but also highlights important unexplained variation. The standard deviation of the dependent variable (ceb) is 2.31. This indicates that the model performs better than a naive baseline prediction that just guesses the mean number of ever born children for all observations.
