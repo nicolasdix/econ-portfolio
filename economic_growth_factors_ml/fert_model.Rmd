@@ -19,6 +19,7 @@ library(ggplot2)
 library(caret)
 library(wooldridge)
 library(randomForest)
+library(glmnet)
 ```
 
 ## 3) Data
@@ -33,39 +34,73 @@ df <- df %>% na.omit()
 summary(df)
 ```
 
-## 4) Random seed and train-test split in 90-10 ratio
+## 4) Random seed and train-test split in 80-20 ratio
 ***
 ```{r}
 set.seed(123)
-train_index <- createDataPartition(df$ceb, p = 0.9, list = F)
+train_index <- createDataPartition(df$ceb, p = 0.8, list = F)
 train_data <- df[train_index, ]
 test_data <- df[-train_index, ]
 ```
 
-## 5) Train model with IVs educ (years of education), age, urban (1 if living in an urban area), electric (1 if access to electricity) and yearborn (birth year of observed woman). Best model is chosen through 5-fold cross-validation.
+## 5) Model Training
 ***
 ```{r}
-formula <- ceb ~ urban*educ + age + electric + yearborn + agefbrth + knowmeth + agefm + heduc + spirit + protest + catholic + evermarr
+nzv <- nearZeroVar(train_data, saveMetrics = TRUE)
+print(nzv)
 
-dev_model <- train(
-  formula,
-  data = train_data,
-  method = "lm",
-  trControl = trainControl(method = "cv", number = 5)
+formula <- ceb ~ urban*educ + poly(age, 2) + urban*electric + agefbrth + agefm + educ*heduc + spirit + protest + catholic
+
+ctrl <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 3
 )
 
-print(dev_model)
+grid <- expand.grid(
+  alpha  = seq(0, 1, length.out = 11),
+  lambda = 10 ^ seq(-3, 1, length.out = 30)
+)
+
+rf_grid <- expand.grid(
+  mtry = c(2,4,6,8,10)
+)
+
+# First model
+dev_model_glmnet <- train(
+  formula,
+  data = train_data,
+  method = "glmnet",
+  trControl = ctrl,
+  preProcess = c("center", "scale", "medianImpute"),
+  tuneGrid = grid,
+  metric = "RMSE"
+)
+
+# Second model
+dev_model_poisson <- train(
+  formula,
+  data = train_data,
+  method = "glm",
+  family = "poisson",
+  trControl = ctrl
+)
 ```
+
 ```{r}
-prediction <- predict(dev_model, newdata = test_data)
+prediction <- predict(dev_model_glmnet, newdata = test_data)
+pred_poisson <- predict(dev_model_poisson, newdata = test_data)
 
 results <- data.frame(
   Actual = test_data$ceb,
-  Predicted = prediction
+  Predicted = prediction,
+  Predicted_Poisson = pred_poisson
 )
 
 rmse <- sqrt(mean((results$Actual - results$Predicted)^2))
+rmse_poisson <- sqrt(mean((results$Actual - results$Predicted_Poisson)^2))
 print(paste("RMSE: ", rmse))
+print(paste("RMSE_Poisson: ", rmse_poisson))
 print(results)
 ```
 
@@ -101,14 +136,12 @@ ggplot(df, aes(x = factor(urban), y = ceb)) +
   theme_minimal()
 ```
 
-## 8) Performance of ML model
-***
 ```{r}
 t.test(ceb ~ urban, data = df)
 ```
 #### It is another textbook assumption that females in urban areas tend to have fewer children than those in rural areas. The graphic above and the accompanying t-test confirm that assumption and show that in fact, females in urban areas usually (95% confidence) have between 0.86 to 1.29 children less than those in rural areas.
 
-## 9) ML model results
+## 8) ML model results
 ***
 ```{r}
 ggplot(results, aes(x = Actual, y = Predicted)) +
@@ -124,11 +157,13 @@ ggplot(results, aes(x = Actual, y = Predicted)) +
 
 #### The plot above shows the actual number of ever born children (dashed line) and the numbers predicted by the ML model.
 
-## 10) Comparison to baseline assumption
+## 9) Comparison to baseline assumption
 ***
 ```{r}
 print(paste("RMSE: ", rmse))
+print(paste("RMSE_Poisson: ", rmse_poisson))
 print(paste("SD(ceb): ", sd(df$ceb)))
 ```
 
-#### The model's RMSE equals 1.57, i.e. on average the model is off by 1.57 "ever born children". Given the complex social, cultural and economic factors that influence fertility, the model has a moderate level of predictive accuracy, but also highlights important unexplained variation. The standard deviation of the dependent variable (ceb) is 2.31. This indicates that the model performs better than a naive baseline prediction that just guesses the mean number of ever born children for all observations.
+#### The Poisson model's RMSE equals 1.56, i.e. on average the model is off by 1.56 "ever born children". Given the complex social, cultural and economic factors that influence fertility, the model has a moderate level of predictive accuracy, but also highlights important unexplained variation. The standard deviation of the dependent variable (ceb) is 2.31. This indicates that the model performs better than a naive baseline prediction that just guesses the mean number of ever born children for all observations.
+
