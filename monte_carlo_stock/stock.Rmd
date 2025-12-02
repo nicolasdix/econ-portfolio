@@ -1,0 +1,172 @@
+---
+title: "Monte Carlo Stock Simulation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(quantmod)
+```
+
+## Getting historical prices from Yahoo Finance
+```{r}
+symbol <- "AAPL"
+
+getSymbols(symbol, src = "yahoo",
+           from = "2019-01-01",
+           to = Sys.Date())
+
+head(AAPL)
+```
+
+## Adjusted Close
+```{r}
+price_xts <- Ad(AAPL)   # adjusted close time series
+head(price_xts)
+```
+
+## Convert to data frame
+```{r}
+price_df <- data.frame(
+  date  = index(price_xts),
+  price = as.numeric(price_xts)
+)
+
+head(price_df)
+```
+
+## Calculate log Returns
+```{r}
+price_df <- price_df %>% 
+  arrange(date)
+
+price_df <- price_df %>% 
+  mutate(
+    log_return = log(price / lag(price)) # shift prices down by one day, so each row sees yesterday's price
+  )
+
+returns_df <- price_df %>%
+  filter(!is.na(log_return)) # first row has no previous price --> NA
+
+head(returns_df)
+```
+
+## Estimating μ and σ from data
+```{r}
+dt <- 1/252
+
+mean_daily <- mean(returns_df$log_return) # average daily log return
+sd_daily   <- sd(returns_df$log_return) # sd of daily log returns
+mu_hat    <- mean_daily * 252 # simple arithmetic drift
+sigma_hat <- sd_daily * sqrt(252) # simple arithmetic drift
+
+mu_hat
+sigma_hat
+```
+
+## Setting up GBM simulation
+```{r}
+set.seed(123)
+
+S0      <- tail(price_df$price, 1)  # last (most recent) price
+mu      <- mu_hat                   # from calibration
+sigma   <- sigma_hat
+days    <- 252
+n_paths <- 10000
+```
+
+## Simulating GBM paths
+```{r}
+eps_mat <- matrix( # random shocks
+  rnorm(days * n_paths, mean = 0, sd = 1),
+  nrow = days,
+  ncol = n_paths
+)
+
+growth_mat <- exp( # multiplicative growth factors
+  (mu - 0.5 * sigma^2) * dt +
+  sigma * sqrt(dt) * eps_mat
+)
+```
+
+## Price paths
+```{r}
+prices_future <- apply(
+  growth_mat,
+  MARGIN = 2,
+  FUN = function(x) S0 * cumprod(x)
+)
+
+prices_future <- rbind(S0, prices_future)  # adding day 0 (today)
+```
+
+## Tidy data to long format
+```{r}
+day_vec_future <- 0:days
+
+future_df <- as.data.frame(prices_future) %>%
+  mutate(day = day_vec_future) %>%
+  pivot_longer(
+    cols = -day,
+    names_to = "path",
+    values_to = "price"
+  )
+```
+
+## Plotting simulated futures: snippet of 50 paths
+```{r}
+set.seed(2025)
+paths_to_plot <- sample(unique(future_df$path), 50)
+
+plot_df <- future_df %>%
+  filter(path %in% paths_to_plot)
+
+ggplot(plot_df, aes(x = day, y = price, group = path, color = path)) +
+  geom_line(alpha = 0.7) +
+  labs(
+    title = paste0(symbol, " - GBM Stock Price Path Simulation"),
+    x = "Days Ahead",
+    y = "Price"
+  ) +
+  theme(legend.position = "none")
+```
+
+## Final prices for all paths
+```{r}
+final_prices <- prices_future[nrow(prices_future), ]
+
+summary(final_prices)
+
+ggplot(data.frame(final_price = final_prices),
+       aes(x = final_price)) +
+  geom_histogram(bins = 60) +
+  labs(
+    title = paste0(symbol, " – Distribution of Simulated Price in 1 Year"),
+    x = "Price in 1 Year",
+    y = "Number of Simulations"
+  )
+```
+
+## Probabilites
+```{r}
+prob_loss    <- mean(final_prices < S0)
+prob_gain_20 <- mean(final_prices > 1.2 * S0)
+prob_drop_20 <- mean(final_prices < 0.8 * S0)
+
+expected_final <- mean(final_prices)
+expected_ret   <- expected_final / S0 - 1
+
+print(paste("P(Gain): ", (1 - prob_loss)*100, "Percent"))
+print(paste("P(Loss): ", prob_loss*100, "Percent"))
+print(paste("P(Gain > 20%): ", prob_gain_20*100, "Percent"))
+print(paste("P(Loose > 20%): ", prob_drop_20*100, "Percent"))
+print(paste("Expected Final Value: ", expected_final, "USD"))
+print(paste("Expected Return: ", expected_ret*100, "Percent"))
+```
+
