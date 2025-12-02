@@ -1,0 +1,2 @@
+The file stock.Rmd contains an annotated pipeline predicting the development of the AAPL stock using a GBM Monte Carlo simulation.
+The file function.R contains a vibe-coded function integrating all steps from stock.Rmd. The user may insert the desired stock in NASDAQ ticker format, the start date for historical data, how many days ahead the simulation should run and the desired number of paths.
